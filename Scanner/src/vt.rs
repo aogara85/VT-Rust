@@ -8,6 +8,7 @@ use std::path::Path;
 use std::fs::OpenOptions;
 use std::{io::Write};
 use chrono::{DateTime, Local};
+use sha256::digest;
 
 static APIKEY:&str="APIKEY";
 
@@ -15,7 +16,7 @@ pub async fn vt_hash_scanner() -> Result<(), Box<dyn std::error::Error>>{
     let args:Vec<String> = env::args().collect();
     let dt: DateTime<Local> = Local::now();
     let timestamp: i64 = dt.timestamp();
-    let filepath=format!("./output/output-{}.csv",timestamp);//ファイル名の生成（時間）
+    let filepath=format!("./output/Hashscan-{}.csv",timestamp);//ファイル名の生成（時間）
     output_csv(format!("meaningful_name,detected,negative,positive,SHA256,MD5,SHA1\n"),&filepath).expect("failed");//outputのフォーマット
     if args[2].as_str()=="-l" || args[2].as_str()=="--list"{
         let file = File::open(args[3].as_str())?;
@@ -111,7 +112,7 @@ pub async fn vt_hash_scanner() -> Result<(), Box<dyn std::error::Error>>{
 pub async fn vt_ip_scanner() -> Result<(), Box<dyn std::error::Error>>{
     let dt: DateTime<Local> = Local::now();
     let timestamp: i64 = dt.timestamp();
-    let filepath=format!("./output/output-{}.csv",timestamp);//ファイル名の生成（時間）
+    let filepath=format!("./output/IPscan-{}.csv",timestamp);//ファイル名の生成（時間）
     let args:Vec<String> = env::args().collect();
     if args[2].as_str() == "-s" || args[2].as_str() == "--single"{
         let client = reqwest::Client::new();
@@ -135,35 +136,35 @@ pub async fn vt_ip_scanner() -> Result<(), Box<dyn std::error::Error>>{
                 let res = client.get(&url).header("x-apikey",APIKEY).send().await?.text().await?;
                 let resj:Value = serde_json::from_str(&res).unwrap();
                 if resj.get("data") != None{
-                let negative = resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap()
-                            + resj["data"]["attributes"]["last_analysis_stats"]["suspicious"].as_u64().unwrap();
+                    let negative = resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap()
+                                + resj["data"]["attributes"]["last_analysis_stats"]["suspicious"].as_u64().unwrap();
 
-                let positive = resj["data"]["attributes"]["last_analysis_stats"]["harmless"].as_u64().unwrap()
-                            + resj["data"]["attributes"]["last_analysis_stats"]["undetected"].as_u64().unwrap();
+                    let positive = resj["data"]["attributes"]["last_analysis_stats"]["harmless"].as_u64().unwrap()
+                                + resj["data"]["attributes"]["last_analysis_stats"]["undetected"].as_u64().unwrap();
 
-                let total    = negative + positive;
-                if resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap() > 0 {
-                    output_csv(format!("{},detected,{},{},{},{}\n"
-                    ,resj["data"]["id"]
-                    ,negative
-                    ,total
-                    ,positive,resj["data"]["links"]["self"])
-                    ,&filepath)
-                    .expect("failed");
-                    println!("{}:\x1b[31mnegative/total {}/{} positive {}\x1b[37m",resj["data"]["id"],negative,total,positive)
-                    //println!("{}\x1b[31m{}\x1b[m",resj["data"]["attributes"]["meaningful_name"],resj["data"]["attributes"]["last_analysis_stats"])
-                }
-                else if resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap() == 0{
-                    output_csv(format!("{},safe,{},{},{},{}\n"
-                    ,resj["data"]["id"]
-                    ,negative
-                    ,total
-                    ,positive,resj["data"]["links"]["self"])
-                    ,&filepath)
-                    .expect("failed");
-                    println!("{}:\x1b[32mnegative/total {}/{} positive {}\x1b[37m",resj["data"]["id"],negative,total,positive)
-                    //println!("{}\x1b[32m{}\x1b[m",resj["data"]["attributes"]["meaningful_name"],resj["data"]["attributes"]["last_analysis_stats"])
-                }
+                    let total    = negative + positive;
+                    if resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap() > 0 {
+                        output_csv(format!("{},detected,{},{},{},{}\n"
+                        ,resj["data"]["id"]
+                        ,negative
+                        ,total
+                        ,positive,resj["data"]["links"]["self"])
+                        ,&filepath)
+                        .expect("failed");
+                        println!("{}:\x1b[31mnegative/total {}/{} positive {}\x1b[37m",resj["data"]["id"],negative,total,positive)
+                        //println!("{}\x1b[31m{}\x1b[m",resj["data"]["attributes"]["meaningful_name"],resj["data"]["attributes"]["last_analysis_stats"])
+                    }
+                    else if resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap() == 0{
+                        output_csv(format!("{},safe,{},{},{},{}\n"
+                        ,resj["data"]["id"]
+                        ,negative
+                        ,total
+                        ,positive,resj["data"]["links"]["self"])
+                        ,&filepath)
+                        .expect("failed");
+                        println!("{}:\x1b[32mnegative/total {}/{} positive {}\x1b[37m",resj["data"]["id"],negative,total,positive)
+                        //println!("{}\x1b[32m{}\x1b[m",resj["data"]["attributes"]["meaningful_name"],resj["data"]["attributes"]["last_analysis_stats"])
+                    }
                 }
                 else {
                     println!("{}",resj["error"]["message"])
@@ -171,7 +172,7 @@ pub async fn vt_ip_scanner() -> Result<(), Box<dyn std::error::Error>>{
         }
     }
     else{
-        println!("Virus Total Hash Scanner Usage:");
+        println!("Virus Total IP Scanner Usage:");
         println!("-s    --single    Query a single IP");
         println!("-l    --list      Specify the path of list file")
     }
@@ -179,7 +180,72 @@ pub async fn vt_ip_scanner() -> Result<(), Box<dyn std::error::Error>>{
     Ok(())
 }
 
-pub async fn vt_domain_scanner() -> Result<(), Box<dyn std::error::Error>>{
+pub async fn vt_url_scanner() -> Result<(), Box<dyn std::error::Error>>{
+    let dt: DateTime<Local> = Local::now();
+    let timestamp: i64 = dt.timestamp();
+    let filepath=format!("./output/URLscan-{}.csv",timestamp);//ファイル名の生成（時間）
+    let args:Vec<String> = env::args().collect();
+    if args[2].as_str() == "-s" || args[2].as_str() == "--single"{
+        let client = reqwest::Client::new();
+        let mut headers = header::HeaderMap::new();
+        headers.insert("x-apikey",APIKEY.parse()?);
+        let url = format!("https://www.virustotal.com/api/v3/urls/{}",digest(args[3].as_str()));
+        let res = client.get(&url).header("x-apikey",APIKEY).send().await?.text().await?;
+        let resj:Value = serde_json::from_str(&res).unwrap();
+        println!("{}:{},Votes:{},categpries:{}",resj["data"]["attributes"]["url"],resj["data"]["attributes"]["last_analysis_stats"],resj["data"]["attributes"]["total_votes"],resj["data"]["attributes"]["categories"]);
+    }
+    else if args[2].as_str()=="-l" || args[2].as_str()=="--list"{
+        let file = File::open(args[3].as_str())?;
+        let buffer = BufReader::new(file);
+        output_csv(format!("url,result,negative,positive,virustotal_link\n"),&filepath).expect("failed");//outputのフォーマット
+        for line in buffer.lines(){
+                let client = reqwest::Client::new();
+                let mut headers = header::HeaderMap::new();
+                headers.insert("x-apikey",APIKEY.parse()?);
+                let url = format!("https://www.virustotal.com/api/v3/urls/{}",digest(line?));
+                let res = client.get(&url).header("x-apikey",APIKEY).send().await?.text().await?;
+                let resj:Value = serde_json::from_str(&res).unwrap();
+                if resj.get("data") != None{
+                    let negative = resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap()
+                                + resj["data"]["attributes"]["last_analysis_stats"]["suspicious"].as_u64().unwrap();
+
+                    let positive = resj["data"]["attributes"]["last_analysis_stats"]["harmless"].as_u64().unwrap()
+                                + resj["data"]["attributes"]["last_analysis_stats"]["undetected"].as_u64().unwrap();
+
+                    let total    = negative + positive;
+                    if resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap() > 0 {
+                        output_csv(format!("{},detected,{},{},{},{}\n"
+                        ,resj["data"]["attributes"]["url"]
+                        ,negative
+                        ,total
+                        ,positive,resj["data"]["links"]["self"])
+                        ,&filepath)
+                        .expect("failed");
+                        println!("{}:\x1b[31mnegative/total {}/{} positive {}\x1b[37m",resj["data"]["attributes"]["url"],negative,total,positive)
+                        //println!("{}\x1b[31m{}\x1b[m",resj["data"]["attributes"]["meaningful_name"],resj["data"]["attributes"]["last_analysis_stats"])
+                    }
+                    else if resj["data"]["attributes"]["last_analysis_stats"]["malicious"].as_u64().unwrap() == 0{
+                        output_csv(format!("{},safe,{},{},{},{}\n"
+                        ,resj["data"]["attributes"]["url"]
+                        ,negative
+                        ,total
+                        ,positive,resj["data"]["links"]["self"])
+                        ,&filepath)
+                        .expect("failed");
+                        println!("{}:\x1b[32mnegative/total {}/{} positive {}\x1b[37m",resj["data"]["attributes"]["url"],negative,total,positive)
+                        //println!("{}\x1b[32m{}\x1b[m",resj["data"]["attributes"]["meaningful_name"],resj["data"]["attributes"]["last_analysis_stats"])
+                    }
+                }
+                else {
+                    println!("{}\n",resj["error"]["message"])
+                }                                    
+        }
+    }
+    else{
+        println!("Virus Total URL Scanner Usage:");
+        println!("-s    --single    Query a single IP");
+        println!("-l    --list      Specify the path of list file")
+    }    
 
     Ok(())
 }

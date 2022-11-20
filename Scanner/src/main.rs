@@ -36,11 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 vt::vt_ip_scanner().await?;        
                     },
             "-U" => {
-                        let scanned_url ="https://xn--shopnamla-8w7d.com/";
-                        let url = format!("https://www.virustotal.com/vtapi/v2/url/report?apikey={}&resource={}",apikey,scanned_url);
-                        let res = reqwest::get(&url).await?.text().await?;
-                        let resj:Value = serde_json::from_str(&res).unwrap();
-                        println!("{}/{}", resj["positives"],resj["total"]);
+                vt::vt_url_scanner().await?;
                     }
         ,
             _ => (),
