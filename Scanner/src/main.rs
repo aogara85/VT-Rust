@@ -23,20 +23,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             //Threatcrowd       https://github.com/AlienVault-OTX/ApiV2
             //Threatminer       https://www.threatminer.org/api.php
             "-D" => {
-                        let domain="google.com";
-                        let url = format!("https://www.virustotal.com/vtapi/v2/domain/report?apikey={}&domain={}",apikey,domain);
-                        let res = reqwest::get(&url).await?.text().await?;
-                        let resj:Value = serde_json::from_str(&res).unwrap();
-                        println!("{:?}", resj["detected_downloaded_samples"]);
+                        vt::vt_domain_scanner().await?;
                     },
             "-F" => {
-                vt::vt_hash_scanner().await?;
+                        vt::vt_hash_scanner().await?;
                     },
             "-I" => {
-                vt::vt_ip_scanner().await?;        
+                        vt::vt_ip_scanner().await?;        
                     },
             "-U" => {
-                vt::vt_url_scanner().await?;
+                        vt::vt_url_scanner().await?;
                     }
         ,
             _ => (),
